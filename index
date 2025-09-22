@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle Financeiro - Família SMarques</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #2c3e50, #4a6741);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      position: relative;
+    }
+    .mobile-link {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      color: white;
+      background: rgba(255,255,255,0.2);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .sync-indicator {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      background: rgba(255,255,255,0.2);
+      padding: 8px 16px;
+      border-radius: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .sync-status { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+    .sync-status.connected { background: #27ae60; }
+    .sync-status.syncing { background: #3498db; }
+    .sync-status.offline { background: #f39c12; }
+    .sync-status.error { background: #e74c3c; }
+    .nav-tabs { display: flex; border-bottom: 2px solid #eee; background: #fafafa; }
+    .nav-tab { padding: 15px 25px; border: none; background: none; cursor: pointer; font-weight: 600; }
+    .nav-tab.active { background: white; color: #2c3e50; }
+    .tab-content { display: none; padding: 20px; }
+    .tab-content.active { display: block; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 5px; }
+    .form-group input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .btn-success { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="mobile.html" class="mobile-link">📱 App Mobile</a>
+      <div class="sync-indicator">
+        <div class="sync-status" id="syncStatus"></div>
+        <span id="syncMessage">Inicializando...</span>
+      </div>
+      <h1>💰 Controle Financeiro</h1>
+      <p>Família SMarques - Gestão Inteligente</p>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab(event,'dashboard')">📊 Dashboard</button>
+      <button class="nav-tab" onclick="switchTab(event,'receitas')">💰 Receitas</button>
+      <button class="nav-tab" onclick="switchTab(event,'despesas')">💸 Despesas</button>
+      <button class="nav-tab" onclick="switchTab(event,'configuracoes')">⚙️ Configurações</button>
+    </div>
+
+    <div class="tab-content active" id="dashboard">
+      <h2>Resumo</h2>
+      <div id="resumoDashboard">Carregando...</div>
+    </div>
+
+    <div class="tab-content" id="receitas">
+      <h2>Adicionar Receita</h2>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="descricaoReceita">
+      </div>
+      <div class="form-group">
+        <label>Valor</label>
+        <input type="number" id="valorReceita">
+      </div>
+      <button class="btn btn-primary" onclick="adicionarReceita()">Adicionar Receita</button>
+    </div>
+
+    <div class="tab-content" id="despesas">
+      <h2>Adicionar Despesa</h2>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="descricaoDespesa">
+      </div>
+      <div class="form-group">
+        <label>Valor</label>
+        <input type="number" id="valorDespesa">
+      </div>
+      <button class="btn btn-primary" onclick="adicionarDespesa()">Adicionar Despesa</button>
+    </div>
+
+    <div class="tab-content" id="configuracoes">
+      <h2>Configurações</h2>
+      <div class="form-group">
+        <label>Usuário GitHub</label>
+        <input type="text" id="githubUser">
+      </div>
+      <div class="form-group">
+        <label>Repositório</label>
+        <input type="text" id="githubRepo">
+      </div>
+      <div class="form-group">
+        <label>Token GitHub</label>
+        <input type="password" id="githubToken">
+      </div>
+      <button class="btn btn-success" onclick="salvarConfiguracoes()">Salvar</button>
+      <button class="btn btn-primary" onclick="sincronizarManual()">🔄 Sincronizar Agora</button>
+      <p id="syncDetails">Aguardando configuração...</p>
+    </div>
+  </div>
+
+  <script src="js/sync.js"></script>
+  <script>
+    let syncManager = null;
+    document.addEventListener('DOMContentLoaded', inicializarSincronizacao);
+
+    async function inicializarSincronizacao() {
+      const githubUser = localStorage.getItem('githubUser') || '';
+      const githubRepo = localStorage.getItem('githubRepo') || '';
+      const githubToken = localStorage.getItem('githubToken') || '';
+      syncManager = initSMarquesSync({ owner: githubUser, repo: githubRepo, token: githubToken });
+
+      syncManager.onStatusChange((status, message) => {
+        document.getElementById('syncStatus').className = `sync-status ${status}`;
+        document.getElementById('syncMessage').textContent = message;
+        document.getElementById('syncDetails').textContent = message + ' - ' + new Date().toLocaleTimeString('pt-BR');
+      });
+
+      syncManager.iniciarSincronizacaoAutomatica(30000);
+      await syncManager.carregarDados();
+      atualizarDashboard();
+      carregarConfiguracoes();
+    }
+
+    function carregarConfiguracoes() {
+      document.getElementById('githubUser').value = localStorage.getItem('githubUser') || '';
+      document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
+      document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
+    }
+
+    async function salvarConfiguracoes() {
+      localStorage.setItem('githubUser', document.getElementById('githubUser').value);
+      localStorage.setItem('githubRepo', document.getElementById('githubRepo').value);
+      localStorage.setItem('githubToken', document.getElementById('githubToken').value);
+      await inicializarSincronizacao();
+      alert('Configurações salvas!');
+    }
+
+    async function sincronizarManual() {
+      await syncManager.carregarDados();
+      atualizarDashboard();
+      alert('Sincronizado!');
+    }
+
+    async function adicionarReceita() {
+      const r = { descricao: document.getElementById('descricaoReceita').value, valor: parseFloat(document.getElementById('valorReceita').value), mes: new Date().getMonth(), ano: new Date().getFullYear() };
+      await syncManager.adicionarReceita(r);
+      atualizarDashboard();
+    }
+    async function adicionarDespesa() {
+      const d = { descricao: document.getElementById('descricaoDespesa').value, valor: parseFloat(document.getElementById('valorDespesa').value), mes: new Date().getMonth(), ano: new Date().getFullYear() };
+      await syncManager.adicionarDespesa(d);
+      atualizarDashboard();
+    }
+    function atualizarDashboard() {
+      if (!syncManager) return;
+      const dados = syncManager.obterDados();
+      const receitas = dados.receitas || [];
+      const despesas = dados.despesas || [];
+      const totalReceitas = receitas.reduce((a,r)=>a+r.valor,0);
+      const totalDespesas = despesas.reduce((a,d)=>a+d.valor,0);
+      document.getElementById('resumoDashboard').textContent = `Receitas: R$ ${totalReceitas.toFixed(2)} | Despesas: R$ ${totalDespesas.toFixed(2)}`;
+    }
+    function switchTab(evt, tabName) {
+      document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      evt.target.classList.add('active');
+    }
+  </script>
+</body>
+</html>
